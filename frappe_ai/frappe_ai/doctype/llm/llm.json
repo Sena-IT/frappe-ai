@@ -1,0 +1,83 @@
+{
+ "actions": [],
+ "autoname": "field:model_id",
+ "creation": "2025-06-23 14:10:51.018242",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "model_id",
+  "model_name",
+  "context_length",
+  "pricing_prompt",
+  "pricing_completion",
+  "is_enabled"
+ ],
+ "fields": [
+  {
+   "fieldname": "model_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Model ID",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "model_name",
+   "fieldtype": "Data",
+   "label": "Model Name"
+  },
+  {
+   "fieldname": "context_length",
+   "fieldtype": "Int",
+   "label": "Context Length"
+  },
+  {
+   "description": "Cost per million input tokens (USD)",
+   "fieldname": "pricing_prompt",
+   "fieldtype": "Float",
+   "label": "Pricing (Prompt)",
+   "precision": "4"
+  },
+  {
+   "description": "Cost per million output tokens (USD)",
+   "fieldname": "pricing_completion",
+   "fieldtype": "Float",
+   "label": "Pricing (Completion)",
+   "precision": "4"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_enabled",
+   "fieldtype": "Check",
+   "label": "Is Enabled"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-06-23 20:01:27.537576",
+ "modified_by": "Administrator",
+ "module": "Frappe Ai",
+ "name": "LLM",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "model_name"
+}

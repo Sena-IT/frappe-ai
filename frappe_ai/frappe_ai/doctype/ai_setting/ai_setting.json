@@ -1,0 +1,100 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2024-07-16 12:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "enable_openrouter",
+  "key_details_section",
+  "site_api_key",
+  "openrouter_user_id",
+  "key_provisioned",
+  "key_hash",
+  "models_section",
+  "available_models",
+  "response"
+ ],
+ "fields": [
+  {
+   "default": "0",
+   "fieldname": "enable_openrouter",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "depends_on": "doc.enable_openrouter",
+   "fieldname": "key_details_section",
+   "fieldtype": "Section Break",
+   "label": "Key Details"
+  },
+  {
+   "depends_on": "doc.enable_openrouter",
+   "fieldname": "site_api_key",
+   "fieldtype": "Password",
+   "label": "Site API Key"
+  },
+  {
+   "depends_on": "doc.enable_openrouter",
+   "fieldname": "openrouter_user_id",
+   "fieldtype": "Data",
+   "label": "OpenRouter User ID",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "depends_on": "doc.enable_openrouter",
+   "fieldname": "key_provisioned",
+   "fieldtype": "Check",
+   "label": "Key Provisioned",
+   "read_only": 1
+  },
+  {
+   "depends_on": "doc.enable_openrouter",
+   "fieldname": "key_hash",
+   "fieldtype": "Data",
+   "label": "Key Hash",
+   "read_only": 1
+  },
+  {
+   "fieldname": "models_section",
+   "fieldtype": "Section Break",
+   "label": "Models"
+  },
+  {
+   "fieldname": "available_models",
+   "fieldtype": "HTML",
+   "label": "Available Models"
+  },
+  {
+   "fieldname": "response",
+   "fieldtype": "Code",
+   "label": "Response"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2025-06-23 22:10:52.144877",
+ "modified_by": "Administrator",
+ "module": "Frappe Ai",
+ "name": "AI Setting",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

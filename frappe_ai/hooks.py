@@ -133,10 +133,8 @@ app_license = "unlicense"
 # Hook on document methods and events
 
 # doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
+# 	"WhatsApp Message": {
+# 		"after_insert": "frappe_ai.ai_processor.process_whatsapp_message"
 # 	}
 # }
 
