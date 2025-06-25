@@ -5,12 +5,18 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "enable_openrouter",
+  "enable_ai",
   "key_details_section",
   "site_api_key",
   "openrouter_user_id",
   "key_provisioned",
   "key_hash",
+  "mcp_server_section",
+  "enable_mcp_server",
+  "mcp_server_command",
+  "mcp_frappe_url",
+  "mcp_frappe_api_key",
+  "mcp_frappe_api_secret",
   "models_section",
   "available_models",
   "response"
@@ -18,24 +24,25 @@
  "fields": [
   {
    "default": "0",
-   "fieldname": "enable_openrouter",
+   "fieldname": "enable_ai",
    "fieldtype": "Check",
-   "label": "Enabled"
+   "label": "Enable AI"
   },
   {
-   "depends_on": "doc.enable_openrouter",
+   "collapsible": 1,
+   "depends_on": "doc.enable_ai",
    "fieldname": "key_details_section",
    "fieldtype": "Section Break",
    "label": "Key Details"
   },
   {
-   "depends_on": "doc.enable_openrouter",
+   "depends_on": "doc.enable_ai",
    "fieldname": "site_api_key",
    "fieldtype": "Password",
    "label": "Site API Key"
   },
   {
-   "depends_on": "doc.enable_openrouter",
+   "depends_on": "doc.enable_ai",
    "fieldname": "openrouter_user_id",
    "fieldtype": "Data",
    "label": "OpenRouter User ID",
@@ -43,18 +50,58 @@
   },
   {
    "default": "0",
-   "depends_on": "doc.enable_openrouter",
+   "depends_on": "doc.enable_ai",
    "fieldname": "key_provisioned",
    "fieldtype": "Check",
    "label": "Key Provisioned",
    "read_only": 1
   },
   {
-   "depends_on": "doc.enable_openrouter",
+   "depends_on": "doc.enable_ai",
    "fieldname": "key_hash",
    "fieldtype": "Data",
    "label": "Key Hash",
    "read_only": 1
+  },
+  {
+   "fieldname": "mcp_server_section",
+   "fieldtype": "Section Break",
+   "label": "Frappe MCP Server"
+  },
+  {
+   "default": "1",
+   "fieldname": "enable_mcp_server",
+   "fieldtype": "Check",
+   "label": "Enable MCP Server"
+  },
+  {
+   "fieldname": "mcp_server_command",
+   "fieldtype": "Data",
+   "label": "MCP Server Command",
+   "description": "The command to execute the MCP server, e.g., npx frappe-mcp-server",
+   "default": "npx frappe-mcp-server"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "mcp_environment_variables_section",
+   "fieldtype": "Section Break",
+   "label": "MCP Environment Variables"
+  },
+  {
+   "fieldname": "mcp_frappe_url",
+   "fieldtype": "Data",
+   "label": "Frappe URL for MCP",
+   "description": "The URL of the Frappe instance the MCP server should connect to."
+  },
+  {
+   "fieldname": "mcp_frappe_api_key",
+   "fieldtype": "Data",
+   "label": "Frappe API Key for MCP"
+  },
+  {
+   "fieldname": "mcp_frappe_api_secret",
+   "fieldtype": "Password",
+   "label": "Frappe API Secret for MCP"
   },
   {
    "fieldname": "models_section",

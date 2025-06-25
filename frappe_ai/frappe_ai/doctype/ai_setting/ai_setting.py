@@ -10,17 +10,17 @@ from frappe.types import DF
 	
 
 class AISetting(Document):
-	enable_openrouter: DF.Check
+	enable_ai: DF.Check
 	site_api_key: DF.Password | None
 	openrouter_user_id: DF.Data | None
 	key_provisioned: DF.Check
 	key_hash: DF.Data | None
 
 	def before_save(self):
-		if self.enable_openrouter and not self.key_provisioned:
+		if self.enable_ai and not self.key_provisioned:
 			self._provision_and_set_key()
 		
-		if not self.enable_openrouter and self.key_provisioned:
+		if not self.enable_ai and self.key_provisioned:
 			self._delete_key()	
 			# self.key_provisioned = 0
 			# self.key_hash = None
@@ -93,6 +93,7 @@ class AISetting(Document):
 			print(f"---OpenRouter Raw Response: {key_data}---")
 			data = key_data.get("data")
 			key=key_data.get("key")
+			print(f"---OpenRouter Key: {key}---")
 			
 			
 			key_hash = data.get("hash")

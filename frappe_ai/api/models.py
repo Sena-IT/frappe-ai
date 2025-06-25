@@ -52,14 +52,13 @@ def run_model_test(model_id: str):
         frappe.throw("API key has not been provisioned for this site.")
     
     prompt = "Tell me the funniest joke you can think of"
-        
-    api_key = settings.site_api_key
+    api_key = settings.get_password("site_api_key")
 
     try:
         headers = {
             "Authorization": f"Bearer {api_key}"
         }
-        print("headers===",headers)
+        print("api_key===",api_key)
         body = {
             "model": model_id,
             "messages": [{"role": "user", "content": prompt}],

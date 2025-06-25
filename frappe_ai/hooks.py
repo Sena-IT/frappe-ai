@@ -110,6 +110,12 @@ app_license = "unlicense"
 # before_app_uninstall = "frappe_ai.utils.before_app_uninstall"
 # after_app_uninstall = "frappe_ai.utils.after_app_uninstall"
 
+# Commands
+# --------
+commands = [
+	"frappe_ai.commands.mcp_dev_server"
+]
+
 # Desk Notifications
 # ------------------
 # See frappe.core.notifications.get_notification_config
@@ -140,6 +146,15 @@ app_license = "unlicense"
 
 # Scheduled Tasks
 # ---------------
+
+
+scheduler_events = {
+	"cron": {
+		"*/5 * * * *": [
+			"frappe_ai.api.tasks.check_and_manage_mcp_server"
+		]
+	}
+}
 
 # scheduler_events = {
 # 	"all": [
