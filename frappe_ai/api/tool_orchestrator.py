@@ -1,6 +1,8 @@
 import frappe
 import requests
 import json
+import os
+import openai
 from frappe_ai.api.mcp_client import list_mcp_tools, call_mcp_tool
 
 def get_openrouter_api_key():
@@ -10,9 +12,18 @@ def get_openrouter_api_key():
         raise frappe.PermissionError("OpenRouter API key has not been provisioned for this site.")
     return settings.get_password("site_api_key")
 
-def llm_call(model_id: str, messages: list, tools: list = None, tool_choice: str = "auto", temperature: float = 0.2):
+def get_openai_api_key():
+    """Retrieves the OpenAI API key from AI Settings."""
+    settings = frappe.get_single("AI Setting")
+    # This assumes a field 'openai_api_key' of type 'Password' exists in 'AI Setting' DocType.
+    openai_key = settings.get_password("openai_api_key")
+    if not openai_key:
+        raise frappe.PermissionError("OpenAI API key is not set in AI Settings.")
+    return openai_key
+
+def openrouter_call(model_id: str, messages: list, tools: list = None, tool_choice: str = "auto", temperature: float = 0.2):
     """
-    Makes a call to the LLM API, supporting tool use.
+    Makes a call to the OpenRouter LLM API, supporting tool use.
     Returns the entire assistant message object from the response.
     """
     api_key = get_openrouter_api_key()
@@ -42,111 +53,144 @@ def llm_call(model_id: str, messages: list, tools: list = None, tool_choice: str
         frappe.log_error(f"LLM call failed: {e.response.text if e.response else e}", "LLM Call Error")
         raise
 
+def openai_responses_call(model_id: str, messages: list, log_container: list = None):
+    """
+    Makes a call to the OpenAI Responses API, supporting tool use and conversation state.
+    Returns the entire response object.
+    """
+    client = openai.OpenAI(api_key=get_openai_api_key())
+    
+    tools_payload = [
+            {
+                "type": "mcp",
+                "server_label": "sentrafrappe",
+                "server_url": "https://5332-115-96-84-178.ngrok-free.app/mcp",
+                "require_approval": "never",
+            },
+        ]
+    # The 'input' parameter expects the full message structure, not just the content string.
+    input_payload = messages 
+    instructions_payload = """ 
+**Key Instructions:**
+- **Follow Tool Schemas**: When calling a tool, you **must** use the exact parameter names defined in its function signature. Refer to the tool's definition to understand the required arguments and their format. Do not guess parameter names.
+- **CRITICAL - Parameter Names**: For `create_document` and `update_document`, the parameter for the document's data is called `values`. The parameter `fields` is used for reading tools like `get_document`. **DO NOT** use `fields` when you mean to use `values`.
+- **Pay Attention to Nested Objects**: Carefully examine every tool's schema for parameters that are of type 'object'. You **must** construct a nested JSON object for these parameters as specified in their schema. Do not flatten the structure. For example: `create_document(doctype='Contact', values={'first_name': 'John'})`.
+- **Never Ask for Information**: You have tools to find information. Use them. Do not ask the user for names, IDs, or other details you can discover yourself.
+- **Self-Correct on Errors**: If a tool returns an error, do not give up. This often means your initial assumption was wrong. Look at the error and try again to solve it with the tools that are available to you.
+- **Do not ask for permission**: Do not ask the user for permission to use a tool. Recursively use the tools to find the answer and complete the task.
+You can call multiple tools in the same run. Do not stop until the task is done. Keep iterating on what to do next given the situation and recursively call tools to solve tasks.
+        """
+
+    if log_container is not None:
+        log_container.append({
+            "step": "LLM Request Payload",
+            "status": "info",
+            "data": {
+                "model": model_id,
+                "input": input_payload,
+                "tools": tools_payload,
+                "instructions": instructions_payload
+            }
+        })
+
+    response = client.responses.create(
+        model=model_id,
+        tools=tools_payload,
+        input=input_payload,
+        instructions=instructions_payload
+    )
+    return response
+
+def llm_call(provider: str, model_id: str, messages: list, tools: list = None, tool_choice: str = "auto", temperature: float = 0.2, previous_response_id: str = None):
+    if provider == "openrouter":
+        return openrouter_call(model_id, messages, tools, tool_choice, temperature)
+    else: # Default to openai
+        return openai_responses_call(model_id, messages)
+
+def format_openai_output_to_log(response_obj):
+    """Formats the OpenAI response object into a structured log for the frontend."""
+    log = []
+    final_response_text = ""
+    
+    if not hasattr(response_obj, 'output') or not response_obj.output:
+        return log, final_response_text
+
+    for item in response_obj.output:
+        item_dict = item.model_dump(exclude_unset=True)
+        step_name = item_dict.get('type', 'Unknown Step').replace('_', ' ').title()
+        status = 'success'
+        data = {}
+
+        if item_dict.get('error'):
+            status = 'error'
+            data['error'] = item_dict['error']
+        
+        if item_dict.get('type') == 'mcp_list_tools':
+            step_name = f"List Tools ({item_dict.get('server_label', '')})"
+            tools_list = item_dict.get('tools', [])
+            data['tools_found'] = len(tools_list)
+            data['tools_schemas'] = tools_list # Log the full schemas
+
+        elif item_dict.get('type') == 'mcp_call':
+            tool_name = item_dict.get('name', 'unknown_tool')
+            step_name = f"Execute Tool: {tool_name}"
+            data['arguments'] = item_dict.get('arguments')
+            # Only show output if it exists
+            if item_dict.get('output'):
+                data['output'] = item_dict.get('output')
+
+        elif item_dict.get('type') == 'message':
+            step_name = "Assistant Message"
+            if item_dict.get('role') == 'assistant' and item_dict.get('content'):
+                text_content = ""
+                for content_part in item_dict['content']:
+                    if content_part.get('type') == 'output_text':
+                        text_content += content_part.get('text', '')
+                # Don't add empty messages to the final response
+                if text_content.strip():
+                    final_response_text += text_content + "\\n\\n"
+                # Skip adding empty assistant messages to the log
+                if not text_content.strip():
+                    continue
+                data['message'] = text_content
+            else:
+                # Don't log non-assistant messages
+                continue
+        
+        log.append({"step": step_name, "status": status, "data": data})
+
+    return log, final_response_text.strip()
+
 @frappe.whitelist()
 def run_tool_orchestration(user_query: str):
     """
     Runs a multi-step tool-use loop, allowing the LLM to recursively use tools
     from the MCP server to answer a user's query.
     """
-    log = []
-    def add_log_step(step_name, status, data):
-        log.append({"step": step_name, "status": status, "data": data})
-
     try:
-        # 1. Get available tools from the MCP server to include in the system prompt
-        add_log_step("List Available Tools", "running", {})
-        mcp_tools_response = list_mcp_tools()
-        available_tools_raw = mcp_tools_response.get("result", {}).get("tools", [])
-        if not available_tools_raw or mcp_tools_response.get("error"):
-            raise Exception(f"Failed to list MCP tools: {mcp_tools_response.get('error', 'No tools found')}")
+        messages = [{"role": "user", "content": user_query}]
+        initial_log = []
+        response_obj = openai_responses_call("gpt-4.1", messages, log_container=initial_log)
+        
+        parsed_log, final_response = format_openai_output_to_log(response_obj)
 
-        # Format for both the LLM API call and for the system prompt
-        formatted_tools = [{"type": "function", "function": tool} for tool in available_tools_raw]
-        tool_descriptions = "\n".join(
-            f"- `{tool['name']}`: {tool['description']}" for tool in available_tools_raw
-        )
-        add_log_step("List Available Tools", "success", {"count": len(formatted_tools), "tools": formatted_tools})
+        log = initial_log + parsed_log
+        
+        has_error = any(step['status'] == 'error' for step in log)
 
-        # 2. Create the system prompt and few-shot example to teach the agent how to think.
-        system_prompt = f"""
-You are a specialized AI assistant for a Frappe-powered system. Your mission is to complete user tasks by autonomously using tools.
+        # If the final response is empty but there's no error, use a default message
+        if not final_response and not has_error:
+            final_response = "The process completed, but no final answer was generated."
 
-**Available Tools**:
-You have access to the following tools. Use them to complete the user's request.
-{tool_descriptions}
-
-
-
-**Key Instructions:**
-- **Never Ask for Information**: You have tools to find information. Use them. Do not ask the user for names, IDs, or other details you can discover yourself.
-- **Self-Correct on Errors**: If a tool returns an error, do not give up. This often means your initial assumption was wrong. Look at the error and try again to solve it with the tools that are available to you.
-- **Do not ask for permission**: Do not ask the user for permission to use a tool. Recursively use the tools to find the answer and complete the task.
-You can call multiple tools in the same run. Do not stop until the task is done. Keep iterating on what to do next given the situation and recursively call tools to solve tasks.
-""" # TODO: Add a few-shot example to teach the agent how to think.
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_query}
-        ]
-        max_turns = 10
-
-        for i in range(max_turns):
-            add_log_step(f"LLM Call (Turn {i+1})", "running", {"messages_sent": messages})
-            
-            assistant_message = llm_call(
-                model_id="openai/gpt-4o",
-                messages=messages,
-                tools=formatted_tools
-            )
-            messages.append(assistant_message)
-            add_log_step(f"LLM Call (Turn {i+1})", "success", {"assistant_response": assistant_message})
-
-            if not assistant_message.get("tool_calls"):
-                final_response = assistant_message.get("content", "I was unable to produce a final answer.")
-                add_log_step("Orchestration Complete", "success", {"final_response": final_response})
-                return {"log": log, "final_response": final_response}
-
-            tool_calls = assistant_message["tool_calls"]
-            tool_results = []
-            for tool_call in tool_calls:
-                tool_name = tool_call["function"]["name"]
-                tool_args_str = tool_call["function"]["arguments"]
-                tool_call_id = tool_call["id"]
-                
-                add_log_step(f"Execute Tool: {tool_name}", "running", {"args": tool_args_str})
-                try:
-                    tool_args = json.loads(tool_args_str)
-                    tool_result_response = call_mcp_tool(tool_name, tool_args)
-                    
-                    if tool_result_response.get("error"):
-                        raise Exception(json.dumps(tool_result_response["error"]))
-                    
-                    result_content = tool_result_response.get("result", {})
-                    add_log_step(f"Execute Tool: {tool_name}", "success", {"result": result_content})
-                    tool_results.append({
-                        "role": "tool", "tool_call_id": tool_call_id, "name": tool_name,
-                        "content": json.dumps(result_content),
-                    })
-                except Exception as e:
-                    error_msg = str(e)
-                    add_log_step(f"Execute Tool: {tool_name}", "error", {"error": error_msg})
-                    tool_results.append({
-                        "role": "tool", "tool_call_id": tool_call_id, "name": tool_name,
-                        "content": json.dumps({"error": error_msg, "details": "The tool failed to execute or returned an error."}),
-                    })
-            
-            messages.extend(tool_results)
-
-        final_response = "The process required too many steps to complete. The task has been halted."
-        add_log_step("Orchestration Halted", "error", {"reason": "Max turns reached"})
-        return {"log": log, "final_response": final_response, "error": True}
-
+        return {"log": log, "final_response": final_response, "error": has_error}
     except Exception as e:
-        error_message = str(e)
-        frappe.log_error(f"Tool Orchestration Failed: {error_message}", "Tool Orchestration")
-        
-        if log and log[-1]["status"] == "running":
-            log[-1]["status"] = "error"
-            log[-1]["data"]["error"] = error_message
-        
-        final_response = f"**Orchestration Failed**\n\nAn error occurred: {error_message}"
-        return {"log": log, "final_response": final_response, "error": True} 
+        frappe.log_error(f"Tool Orchestration Failed: {str(e)}", "Tool Orchestration")
+        return {
+            "log": [{
+                "step": "Orchestration Failed",
+                "status": "error",
+                "data": {"error": str(e)}
+            }],
+            "final_response": f"**Orchestration Failed**\n\nAn unhandled error occurred: {str(e)}",
+            "error": True
+        }

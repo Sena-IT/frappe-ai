@@ -19,7 +19,9 @@
   "mcp_frappe_api_secret",
   "models_section",
   "available_models",
-  "response"
+  "response",
+  "open_ai_models_direct_api_section",
+  "openai_api_key"
  ],
  "fields": [
   {
@@ -33,7 +35,7 @@
    "depends_on": "doc.enable_ai",
    "fieldname": "key_details_section",
    "fieldtype": "Section Break",
-   "label": "Key Details"
+   "label": "Open Router"
   },
   {
    "depends_on": "doc.enable_ai",
@@ -64,6 +66,7 @@
    "read_only": 1
   },
   {
+   "collapsible": 1,
    "fieldname": "mcp_server_section",
    "fieldtype": "Section Break",
    "label": "Frappe MCP Server"
@@ -75,23 +78,17 @@
    "label": "Enable MCP Server"
   },
   {
+   "default": "npx frappe-mcp-server",
+   "description": "The command to execute the MCP server, e.g., npx frappe-mcp-server",
    "fieldname": "mcp_server_command",
    "fieldtype": "Data",
-   "label": "MCP Server Command",
-   "description": "The command to execute the MCP server, e.g., npx frappe-mcp-server",
-   "default": "npx frappe-mcp-server"
+   "label": "MCP Server Command"
   },
   {
-   "collapsible": 1,
-   "fieldname": "mcp_environment_variables_section",
-   "fieldtype": "Section Break",
-   "label": "MCP Environment Variables"
-  },
-  {
+   "description": "The URL of the Frappe instance the MCP server should connect to.",
    "fieldname": "mcp_frappe_url",
    "fieldtype": "Data",
-   "label": "Frappe URL for MCP",
-   "description": "The URL of the Frappe instance the MCP server should connect to."
+   "label": "Frappe URL for MCP"
   },
   {
    "fieldname": "mcp_frappe_api_key",
@@ -104,9 +101,10 @@
    "label": "Frappe API Secret for MCP"
   },
   {
+   "collapsible": 1,
    "fieldname": "models_section",
    "fieldtype": "Section Break",
-   "label": "Models"
+   "label": "Models via OpenRouter"
   },
   {
    "fieldname": "available_models",
@@ -117,12 +115,23 @@
    "fieldname": "response",
    "fieldtype": "Code",
    "label": "Response"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "open_ai_models_direct_api_section",
+   "fieldtype": "Section Break",
+   "label": "Open AI models (direct API)"
+  },
+  {
+   "fieldname": "openai_api_key",
+   "fieldtype": "Password",
+   "label": "OpenAI API Key"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-06-23 22:10:52.144877",
+ "modified": "2025-06-28 13:57:38.928653",
  "modified_by": "Administrator",
  "module": "Frappe Ai",
  "name": "AI Setting",
