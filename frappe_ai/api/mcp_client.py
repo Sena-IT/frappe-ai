@@ -43,7 +43,7 @@ def call_mcp_tool(tool_name: str, arguments: dict, timeout: int = 20) -> dict:
     """
     try:
         settings = frappe.get_single("AI Setting")
-        url = f"http://127.0.0.1:4000/mcp"
+        url = settings.mcp_server_url
     except Exception:
         raise ConnectionError("Could not get MCP server port from AI Settings.")
 
@@ -69,7 +69,7 @@ def list_mcp_tools(timeout: int = 20) -> dict:
     """
     try:
         settings = frappe.get_single("AI Setting")
-        url = f"http://127.0.0.1:4000/mcp"
+        url = settings.mcp_server_url
     except Exception:
         raise ConnectionError("Could not get MCP server port from AI Settings.")
 
@@ -94,7 +94,7 @@ def read_mcp_resource(uri: str, timeout: int = 20) -> dict:
     """
     try:
         settings = frappe.get_single("AI Setting")
-        url = f"http://127.0.0.1:4000/mcp"
+        url = settings.mcp_server_url
     except Exception:
         raise ConnectionError("Could not get MCP server port from AI Settings.")
 

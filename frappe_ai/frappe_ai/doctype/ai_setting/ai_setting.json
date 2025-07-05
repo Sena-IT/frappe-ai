@@ -14,6 +14,7 @@
   "mcp_server_section",
   "enable_mcp_server",
   "mcp_server_command",
+  "mcp_server_url",
   "mcp_frappe_url",
   "mcp_frappe_api_key",
   "mcp_frappe_api_secret",
@@ -83,6 +84,12 @@
    "fieldname": "mcp_server_command",
    "fieldtype": "Data",
    "label": "MCP Server Command"
+  },
+  {
+   "description": "The URL where the MCP server is running, e.g., https://example.ngrok-free.app/mcp",
+   "fieldname": "mcp_server_url",
+   "fieldtype": "Data",
+   "label": "MCP Server URL"
   },
   {
    "description": "The URL of the Frappe instance the MCP server should connect to.",

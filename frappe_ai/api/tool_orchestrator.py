@@ -5,28 +5,43 @@ import os
 import openai
 from frappe_ai.api.mcp_client import list_mcp_tools, call_mcp_tool
 
-def get_openrouter_api_key():
+def get_ai_settings():
+    """Retrieves the AI Settings document once."""
+    return frappe.get_single("AI Setting")
+
+def get_openrouter_api_key(settings=None):
     """Retrieves the provisioned OpenRouter API key from AI Settings."""
-    settings = frappe.get_single("AI Setting")
+    if settings is None:
+        settings = get_ai_settings()
     if not settings.key_provisioned:
         raise frappe.PermissionError("OpenRouter API key has not been provisioned for this site.")
     return settings.get_password("site_api_key")
 
-def get_openai_api_key():
+def get_openai_api_key(settings=None):
     """Retrieves the OpenAI API key from AI Settings."""
-    settings = frappe.get_single("AI Setting")
+    if settings is None:
+        settings = get_ai_settings()
     # This assumes a field 'openai_api_key' of type 'Password' exists in 'AI Setting' DocType.
     openai_key = settings.get_password("openai_api_key")
     if not openai_key:
         raise frappe.PermissionError("OpenAI API key is not set in AI Settings.")
     return openai_key
 
-def openrouter_call(model_id: str, messages: list, tools: list = None, tool_choice: str = "auto", temperature: float = 0.2):
+def get_mcp_server_url(settings=None):
+    """Retrieves the MCP server URL from AI Settings."""
+    if settings is None:
+        settings = get_ai_settings()
+    mcp_url = settings.get("mcp_server_url")
+    if not mcp_url:
+        raise frappe.ValidationError("MCP Server URL is not set in AI Settings.")
+    return mcp_url
+
+def openrouter_call(model_id: str, messages: list, tools: list = None, tool_choice: str = "auto", temperature: float = 0.2, settings=None):
     """
     Makes a call to the OpenRouter LLM API, supporting tool use.
     Returns the entire assistant message object from the response.
     """
-    api_key = get_openrouter_api_key()
+    api_key = get_openrouter_api_key(settings)
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
@@ -53,18 +68,22 @@ def openrouter_call(model_id: str, messages: list, tools: list = None, tool_choi
         frappe.log_error(f"LLM call failed: {e.response.text if e.response else e}", "LLM Call Error")
         raise
 
-def openai_responses_call(model_id: str, messages: list, log_container: list = None):
+def openai_responses_call(model_id: str, messages: list, log_container: list = None, settings=None):
     """
     Makes a call to the OpenAI Responses API, supporting tool use and conversation state.
     Returns the entire response object.
     """
-    client = openai.OpenAI(api_key=get_openai_api_key())
+    if settings is None:
+        settings = get_ai_settings()
+    
+    client = openai.OpenAI(api_key=get_openai_api_key(settings))
+    mcp_server_url = get_mcp_server_url(settings)
     
     tools_payload = [
             {
                 "type": "mcp",
                 "server_label": "sentrafrappe",
-                "server_url": "https://5332-115-96-84-178.ngrok-free.app/mcp",
+                "server_url": mcp_server_url,
                 "require_approval": "never",
             },
         ]
@@ -83,13 +102,11 @@ You can call multiple tools in the same run. Do not stop until the task is done.
 
     if log_container is not None:
         log_container.append({
-            "step": "LLM Request Payload",
+            "step": "LLM Call",
             "status": "info",
             "data": {
                 "model": model_id,
-                "input": input_payload,
-                "tools": tools_payload,
-                "instructions": instructions_payload
+                "message_count": len(input_payload) if isinstance(input_payload, list) else 1
             }
         })
 
@@ -102,10 +119,13 @@ You can call multiple tools in the same run. Do not stop until the task is done.
     return response
 
 def llm_call(provider: str, model_id: str, messages: list, tools: list = None, tool_choice: str = "auto", temperature: float = 0.2, previous_response_id: str = None):
+    # Get settings once and pass to the appropriate function
+    settings = get_ai_settings()
+    
     if provider == "openrouter":
-        return openrouter_call(model_id, messages, tools, tool_choice, temperature)
+        return openrouter_call(model_id, messages, tools, tool_choice, temperature, settings)
     else: # Default to openai
-        return openai_responses_call(model_id, messages)
+        return openai_responses_call(model_id, messages, settings=settings)
 
 def format_openai_output_to_log(response_obj):
     """Formats the OpenAI response object into a structured log for the frontend."""
@@ -129,15 +149,26 @@ def format_openai_output_to_log(response_obj):
             step_name = f"List Tools ({item_dict.get('server_label', '')})"
             tools_list = item_dict.get('tools', [])
             data['tools_found'] = len(tools_list)
-            data['tools_schemas'] = tools_list # Log the full schemas
+            # Log only tool names, not full schemas
+            data['tool_names'] = [tool.get('name', 'unknown') for tool in tools_list] if tools_list else []
 
         elif item_dict.get('type') == 'mcp_call':
             tool_name = item_dict.get('name', 'unknown_tool')
             step_name = f"Execute Tool: {tool_name}"
-            data['arguments'] = item_dict.get('arguments')
-            # Only show output if it exists
+            data['tool_name'] = tool_name
+            # Log summary instead of full arguments and output
+            if item_dict.get('arguments'):
+                data['arguments_provided'] = True
+                data['arg_count'] = len(item_dict.get('arguments', {}))
             if item_dict.get('output'):
-                data['output'] = item_dict.get('output')
+                output = item_dict.get('output')
+                data['output_received'] = True
+                # Summarize output instead of logging everything
+                if isinstance(output, str):
+                    data['output_size'] = len(output)
+                elif isinstance(output, (list, dict)):
+                    data['output_type'] = type(output).__name__
+                    data['output_size'] = len(str(output)) if output else 0
 
         elif item_dict.get('type') == 'message':
             step_name = "Assistant Message"
@@ -152,7 +183,11 @@ def format_openai_output_to_log(response_obj):
                 # Skip adding empty assistant messages to the log
                 if not text_content.strip():
                     continue
-                data['message'] = text_content
+                # Log message length instead of full content for brevity
+                data['message_length'] = len(text_content)
+                data['has_content'] = True
+                # Only log first 100 chars for debugging if needed
+                data['preview'] = text_content[:100] + "..." if len(text_content) > 100 else text_content
             else:
                 # Don't log non-assistant messages
                 continue
@@ -168,15 +203,30 @@ def run_tool_orchestration(user_query: str):
     from the MCP server to answer a user's query.
     """
     try:
+        # Get settings once for the entire orchestration
+        settings = get_ai_settings()
+        
         messages = [{"role": "user", "content": user_query}]
         initial_log = []
-        response_obj = openai_responses_call("gpt-4.1", messages, log_container=initial_log)
+        response_obj = openai_responses_call("gpt-4.1", messages, log_container=initial_log, settings=settings)
         
         parsed_log, final_response = format_openai_output_to_log(response_obj)
 
         log = initial_log + parsed_log
         
         has_error = any(step['status'] == 'error' for step in log)
+
+        # Add completion summary
+        tool_calls = len([step for step in log if step['step'].startswith('Execute Tool:')])
+        log.append({
+            "step": "Orchestration Complete",
+            "status": "success" if not has_error else "completed_with_errors",
+            "data": {
+                "total_steps": len(log),
+                "tool_calls": tool_calls,
+                "final_response": final_response
+            }
+        })
 
         # If the final response is empty but there's no error, use a default message
         if not final_response and not has_error:
@@ -193,4 +243,4 @@ def run_tool_orchestration(user_query: str):
             }],
             "final_response": f"**Orchestration Failed**\n\nAn unhandled error occurred: {str(e)}",
             "error": True
-        }
+        } 
