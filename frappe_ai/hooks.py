@@ -138,11 +138,11 @@ commands = [
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"WhatsApp Message": {
-# 		"after_insert": "frappe_ai.ai_processor.process_whatsapp_message"
-# 	}
-# }
+doc_events = {
+	"WhatsApp Message": {
+		"after_insert": "frappe_ai.integrations.sales_bot.process_incoming_communication"
+	}
+}
 
 # Scheduled Tasks
 # ---------------
