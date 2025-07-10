@@ -139,8 +139,9 @@ commands = [
 # Hook on document methods and events
 
 doc_events = {
-	"WhatsApp Message": {
-		"after_insert": "frappe_ai.integrations.sales_bot.process_incoming_communication"
+	"Communication": {
+		"after_insert": "frappe_ai.integrations.sales_bot.process_incoming_communication",
+		"on_update": "frappe_ai.integrations.sales_bot.process_incoming_communication"
 	}
 }
 
